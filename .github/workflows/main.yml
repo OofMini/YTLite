@@ -34,41 +34,11 @@ on:
         required: true
         default: false
 
-      enable_ytabconfig:
-        description: "Integrate YTABConfig"
-        type: boolean
-        required: true
-        default: false
-
-      enable_youmute:
-        description: "Integrate YouMute"
-        type: boolean
-        required: true
-        default: false
-
-      enable_ytnotracking:
-        description: "Integrate YTNoTracking"
-        type: boolean
-        required: true
-        default: false
-
-      enable_youremembercaption:
-        description: "Integrate YouRememberCaption"
-        type: boolean
-        required: true
-        default: false
-
-      enable_noytpremium:
-        description: "Integrate NoYtPremium"
-        type: boolean
-        required: true
-        default: false
-
-      enable_youtimestamp:
-        description: "Integrate YouTimeStamp"
-        type: boolean
-        required: true
-        default: false
+      extra_tweaks:
+        description: "++ Additional Tweaks (comma-separated: YTABConfig,YouMute,YTNoTracking,YouRememberCaption,NoYtPremium,YouTimeStamp)"
+        type: string
+        required: false
+        default: ""
 
       ipa_url:
         description: "URL to the decrypted IPA file"
@@ -94,12 +64,6 @@ on:
         required: true
         type: string
 
-      info_note:
-        description: "TIP: Learn more about integrations in the README via the link below"
-        default: "https://github.com/dayanch96/YTLite#tweak-integration-details"
-        type: string
-        required: false
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -121,7 +85,7 @@ jobs:
       - name: Hide sensitive inputs
         uses: levibostian/action-hide-sensitive-inputs@v1
         with:
-          exclude_inputs: bundle_id,display_name,enable_demc,enable_ryd,enable_youpip,enable_yq,enable_ytuhd,enable_ytabconfig,enable_youmute,enable_ytnotracking,enable_youremembercaption,enable_noytpremium,enable_youtimestamp,info_note,tweak_version
+          exclude_inputs: bundle_id,display_name,enable_demc,enable_ryd,enable_youpip,enable_yq,enable_ytuhd,extra_tweaks,tweak_version
 
       - name: Download and validate IPA
         run: |
@@ -140,8 +104,19 @@ jobs:
       - name: Set PATH environment variable
         run: echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH
 
+      - name: Parse extra tweaks
+        id: parse_tweaks
+        run: |
+          EXTRAS="${{ github.event.inputs.extra_tweaks }}"
+          echo "enable_ytabconfig=$(echo "$EXTRAS" | grep -qi "ytabconfig" && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          echo "enable_youmute=$(echo "$EXTRAS" | grep -qi "youmute" && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          echo "enable_ytnotracking=$(echo "$EXTRAS" | grep -qi "ytnotracking" && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          echo "enable_youremembercaption=$(echo "$EXTRAS" | grep -qi "youremembercaption" && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          echo "enable_noytpremium=$(echo "$EXTRAS" | grep -qi "noytpremium" && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          echo "enable_youtimestamp=$(echo "$EXTRAS" | grep -qi "youtimestamp" && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+
       - name: Cache Theos
-        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_youmute || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp }}
+        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || steps.parse_tweaks.outputs.enable_ytabconfig == 'true' || steps.parse_tweaks.outputs.enable_youmute == 'true' || steps.parse_tweaks.outputs.enable_ytnotracking == 'true' || steps.parse_tweaks.outputs.enable_youremembercaption == 'true' || steps.parse_tweaks.outputs.enable_noytpremium == 'true' || steps.parse_tweaks.outputs.enable_youtimestamp == 'true' }}
         id: theos
         uses: actions/cache@v4
         env:
@@ -152,7 +127,7 @@ jobs:
           restore-keys: ${{ env.cache-name }}
 
       - name: Setup Theos
-        if: ${{ (github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_youmute || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp) && steps.theos.outputs.cache-hit != 'true' }}
+        if: ${{ (github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || steps.parse_tweaks.outputs.enable_ytabconfig == 'true' || steps.parse_tweaks.outputs.enable_youmute == 'true' || steps.parse_tweaks.outputs.enable_ytnotracking == 'true' || steps.parse_tweaks.outputs.enable_youremembercaption == 'true' || steps.parse_tweaks.outputs.enable_noytpremium == 'true' || steps.parse_tweaks.outputs.enable_youtimestamp == 'true') && steps.theos.outputs.cache-hit != 'true' }}
         uses: actions/checkout@v4.1.7
         with:
           repository: theos/theos
@@ -161,7 +136,7 @@ jobs:
           submodules: recursive
 
       - name: Download iOS SDK
-        if: ${{ (github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_youmute || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp) && steps.theos.outputs.cache-hit != 'true' }}
+        if: ${{ (github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || steps.parse_tweaks.outputs.enable_ytabconfig == 'true' || steps.parse_tweaks.outputs.enable_youmute == 'true' || steps.parse_tweaks.outputs.enable_ytnotracking == 'true' || steps.parse_tweaks.outputs.enable_youremembercaption == 'true' || steps.parse_tweaks.outputs.enable_noytpremium == 'true' || steps.parse_tweaks.outputs.enable_youtimestamp == 'true') && steps.theos.outputs.cache-hit != 'true' }}
         run: |
           git clone --quiet -n --depth=1 --filter=tree:0 https://github.com/theos/sdks/
           cd sdks
@@ -189,7 +164,7 @@ jobs:
           mv *.appex ${{ github.workspace }}
 
       - name: Clone YouTubeHeader
-        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_youmute || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp }}
+        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || steps.parse_tweaks.outputs.enable_ytabconfig == 'true' || steps.parse_tweaks.outputs.enable_youmute == 'true' || steps.parse_tweaks.outputs.enable_ytnotracking == 'true' || steps.parse_tweaks.outputs.enable_youremembercaption == 'true' || steps.parse_tweaks.outputs.enable_noytpremium == 'true' || steps.parse_tweaks.outputs.enable_youtimestamp == 'true' }}
         run: |
           if [ -d "$THEOS/include/YouTubeHeader" ]; then
             echo "YouTubeHeader exists. Pulling latest changes..."
@@ -210,7 +185,7 @@ jobs:
           THEOS: ${{ github.workspace }}/theos
 
       - name: Clone PSHeader
-        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_youmute || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp }}
+        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || steps.parse_tweaks.outputs.enable_ytabconfig == 'true' || steps.parse_tweaks.outputs.enable_youmute == 'true' || steps.parse_tweaks.outputs.enable_ytnotracking == 'true' || steps.parse_tweaks.outputs.enable_youremembercaption == 'true' || steps.parse_tweaks.outputs.enable_noytpremium == 'true' || steps.parse_tweaks.outputs.enable_youtimestamp == 'true' }}
         run: |
           if [ -d "$THEOS/include/PSHeader" ]; then
             echo "PSHeader exists. Pulling latest changes..."
@@ -269,37 +244,37 @@ jobs:
           git clone --quiet --depth=1 --recurse-submodules https://github.com/therealFoxster/DontEatMyContent.git
 
       - name: Clone YTABConfig
-        if: ${{ github.event.inputs.enable_ytabconfig }}
+        if: ${{ steps.parse_tweaks.outputs.enable_ytabconfig == 'true' }}
         run: |
           cd ${{ github.workspace }}
           git clone --quiet --depth=1 https://github.com/PoomSmart/YTABConfig.git
 
       - name: Clone YouMute
-        if: ${{ github.event.inputs.enable_youmute }}
+        if: ${{ steps.parse_tweaks.outputs.enable_youmute == 'true' }}
         run: |
           cd ${{ github.workspace }}
           git clone --quiet --depth=1 https://github.com/PoomSmart/YouMute.git
 
       - name: Clone YTNoTracking
-        if: ${{ github.event.inputs.enable_ytnotracking }}
+        if: ${{ steps.parse_tweaks.outputs.enable_ytnotracking == 'true' }}
         run: |
           cd ${{ github.workspace }}
           git clone --quiet --depth=1 https://github.com/PoomSmart/YTNoTracking.git
 
       - name: Clone YouRememberCaption
-        if: ${{ github.event.inputs.enable_youremembercaption }}
+        if: ${{ steps.parse_tweaks.outputs.enable_youremembercaption == 'true' }}
         run: |
           cd ${{ github.workspace }}
           git clone --quiet --depth=1 https://github.com/PoomSmart/YouRememberCaption.git
 
       - name: Clone NoYtPremium
-        if: ${{ github.event.inputs.enable_noytpremium }}
+        if: ${{ steps.parse_tweaks.outputs.enable_noytpremium == 'true' }}
         run: |
           cd ${{ github.workspace }}
           git clone --quiet --depth=1 https://github.com/PoomSmart/NoYtPremium.git
 
       - name: Clone YouTimeStamp
-        if: ${{ github.event.inputs.enable_youtimestamp }}
+        if: ${{ steps.parse_tweaks.outputs.enable_youtimestamp == 'true' }}
         run: |
           cd ${{ github.workspace }}
           git clone --quiet --depth=1 https://github.com/PoomSmart/YouTimeStamp.git
@@ -368,7 +343,7 @@ jobs:
           THEOS: ${{ github.workspace }}/theos
 
       - name: Build YTABConfig
-        if: ${{ github.event.inputs.enable_ytabconfig }}
+        if: ${{ steps.parse_tweaks.outputs.enable_ytabconfig == 'true' }}
         run: |
           cd ${{ github.workspace }}/YTABConfig
           make clean package DEBUG=0 FINALPACKAGE=1
@@ -377,7 +352,7 @@ jobs:
           THEOS: ${{ github.workspace }}/theos
 
       - name: Build YouMute
-        if: ${{ github.event.inputs.enable_youmute }}
+        if: ${{ steps.parse_tweaks.outputs.enable_youmute == 'true' }}
         run: |
           cd ${{ github.workspace }}/YouMute
           make clean package DEBUG=0 FINALPACKAGE=1
@@ -386,7 +361,7 @@ jobs:
           THEOS: ${{ github.workspace }}/theos
 
       - name: Build YTNoTracking
-        if: ${{ github.event.inputs.enable_ytnotracking }}
+        if: ${{ steps.parse_tweaks.outputs.enable_ytnotracking == 'true' }}
         run: |
           cd ${{ github.workspace }}/YTNoTracking
           make clean package DEBUG=0 FINALPACKAGE=1
@@ -395,7 +370,7 @@ jobs:
           THEOS: ${{ github.workspace }}/theos
 
       - name: Build YouRememberCaption
-        if: ${{ github.event.inputs.enable_youremembercaption }}
+        if: ${{ steps.parse_tweaks.outputs.enable_youremembercaption == 'true' }}
         run: |
           cd ${{ github.workspace }}/YouRememberCaption
           make clean package DEBUG=0 FINALPACKAGE=1
@@ -404,7 +379,7 @@ jobs:
           THEOS: ${{ github.workspace }}/theos
 
       - name: Build NoYtPremium
-        if: ${{ github.event.inputs.enable_noytpremium }}
+        if: ${{ steps.parse_tweaks.outputs.enable_noytpremium == 'true' }}
         run: |
           cd ${{ github.workspace }}/NoYtPremium
           make clean package DEBUG=0 FINALPACKAGE=1
@@ -413,7 +388,7 @@ jobs:
           THEOS: ${{ github.workspace }}/theos
 
       - name: Build YouTimeStamp
-        if: ${{ github.event.inputs.enable_youtimestamp }}
+        if: ${{ steps.parse_tweaks.outputs.enable_youtimestamp == 'true' }}
         run: |
           cd ${{ github.workspace }}/YouTimeStamp
           make clean package DEBUG=0 FINALPACKAGE=1
