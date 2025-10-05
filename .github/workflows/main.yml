@@ -34,12 +34,6 @@ on:
         required: true
         default: false
 
-      enable_ytabconfig:
-        description: "Integrate YTABConfig"
-        type: boolean
-        required: true
-        default: false
-
       enable_ytnotracking:
         description: "Integrate YTNoTracking"
         type: boolean
@@ -109,7 +103,7 @@ jobs:
       - name: Hide sensitive inputs
         uses: levibostian/action-hide-sensitive-inputs@v1
         with:
-          exclude_inputs: bundle_id,display_name,enable_demc,enable_ryd,enable_youpip,enable_yq,enable_ytuhd,enable_ytabconfig,enable_ytnotracking,enable_youremembercaption,enable_noytpremium,enable_youtimestamp,tweak_version
+          exclude_inputs: bundle_id,display_name,enable_demc,enable_ryd,enable_youpip,enable_yq,enable_ytuhd,enable_ytnotracking,enable_youremembercaption,enable_noytpremium,enable_youtimestamp,tweak_version
 
       - name: Download and validate IPA
         run: |
@@ -129,7 +123,7 @@ jobs:
         run: echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH
 
       - name: Cache Theos
-        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp }}
+        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp }}
         id: theos
         uses: actions/cache@v4
         env:
@@ -140,7 +134,7 @@ jobs:
           restore-keys: ${{ env.cache-name }}
 
       - name: Setup Theos
-        if: ${{ (github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp) && steps.theos.outputs.cache-hit != 'true' }}
+        if: ${{ (github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp) && steps.theos.outputs.cache-hit != 'true' }}
         uses: actions/checkout@v4.1.7
         with:
           repository: theos/theos
@@ -149,7 +143,7 @@ jobs:
           submodules: recursive
 
       - name: Download iOS SDK
-        if: ${{ (github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp) && steps.theos.outputs.cache-hit != 'true' }}
+        if: ${{ (github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp) && steps.theos.outputs.cache-hit != 'true' }}
         run: |
           git clone --quiet -n --depth=1 --filter=tree:0 https://github.com/theos/sdks/
           cd sdks
@@ -177,7 +171,7 @@ jobs:
           mv *.appex ${{ github.workspace }}
 
       - name: Clone YouTubeHeader
-        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp }}
+        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp }}
         run: |
           if [ -d "$THEOS/include/YouTubeHeader" ]; then
             echo "YouTubeHeader exists. Pulling latest changes..."
@@ -198,7 +192,7 @@ jobs:
           THEOS: ${{ github.workspace }}/theos
 
       - name: Clone PSHeader
-        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp }}
+        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp }}
         run: |
           if [ -d "$THEOS/include/PSHeader" ]; then
             echo "PSHeader exists. Pulling latest changes..."
@@ -255,12 +249,6 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           git clone --quiet --depth=1 --recurse-submodules https://github.com/therealFoxster/DontEatMyContent.git
-
-      - name: Clone YTABConfig
-        if: ${{ github.event.inputs.enable_ytabconfig }}
-        run: |
-          cd ${{ github.workspace }}
-          git clone --quiet --depth=1 https://github.com/PoomSmart/YTABConfig.git
 
       - name: Clone YTNoTracking
         if: ${{ github.event.inputs.enable_ytnotracking }}
@@ -346,15 +334,6 @@ jobs:
           cd ${{ github.workspace }}/DontEatMyContent
           make clean package DEBUG=0 FINALPACKAGE=1
           mv packages/*.deb ${{ github.workspace }}/demc.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Build YTABConfig
-        if: ${{ github.event.inputs.enable_ytabconfig }}
-        run: |
-          cd ${{ github.workspace }}/YTABConfig
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/ytabconfig.deb
         env:
           THEOS: ${{ github.workspace }}/theos
 
