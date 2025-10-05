@@ -3,444 +3,255 @@ name: Create YouTube Plus app
 on:
   workflow_dispatch:
     inputs:
-
       enable_youpip:
         description: "Integrate YouPiP"
         type: boolean
         required: true
         default: false
-
       enable_ytuhd:
         description: "Integrate YTUHD"
         type: boolean
         required: true
         default: false
-
       enable_yq:
         description: "Integrate YouQuality"
         type: boolean
         required: true
         default: false
-
       enable_ryd:
         description: "Integrate Return YouTube Dislikes"
         type: boolean
         required: true
         default: false
-
       enable_demc:
         description: "Integrate DontEatMyContent"
         type: boolean
         required: true
         default: false
-
       enable_ytabconfig:
         description: "Integrate YTABConfig"
         type: boolean
         required: true
         default: false
-
       enable_youmute:
         description: "Integrate YouMute"
         type: boolean
         required: true
         default: false
-
       enable_ytnotracking:
         description: "Integrate YTNoTracking"
         type: boolean
         required: true
         default: false
-
       enable_youremembercaption:
         description: "Integrate YouRememberCaption"
         type: boolean
         required: true
         default: false
-
       enable_noytpremium:
         description: "Integrate NoYtPremium"
         type: boolean
         required: true
         default: false
-
       enable_youtimestamp:
         description: "Integrate YouTimeStamp"
         type: boolean
         required: true
         default: false
-
       ipa_url:
         description: "URL to the decrypted IPA file"
         default: ""
         required: true
         type: string
-
       tweak_version:
         description: "The version of the tweak to use. Enter the version manually from dayanch96/YTLite/releases or leave default"
         default: "5.2b3"
         required: true
         type: string
-
       display_name:
         description: "App Name (Optional)"
         default: "YouTube"
         required: true
         type: string
-
       bundle_id:
         description: "BundleID (Optional)"
         default: "com.google.ios.youtube"
         required: true
         type: string
 
-      info_note:
-        description: "TIP: Learn more about integrations in the README via the link below"
-        default: "https://github.com/dayanch96/YTLite#tweak-integration-details"
-        type: string
-        required: false
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build:
-    name: 
+    name: Build YouTube Plus
     runs-on: macos-latest
     permissions:
       contents: write
 
     steps:
-      - name: Checkout Main
-        uses: actions/checkout@v4.1.1
-        with:
-          path: main
-          submodules: recursive
-
-      - name: Hide sensitive inputs
-        uses: levibostian/action-hide-sensitive-inputs@v1
-        with:
-          exclude_inputs: bundle_id,display_name,enable_demc,enable_ryd,enable_youpip,enable_yq,enable_ytuhd,enable_ytabconfig,enable_youmute,enable_ytnotracking,enable_youremembercaption,enable_noytpremium,enable_youtimestamp,info_note,tweak_version
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
       - name: Download and validate IPA
         run: |
-          wget "${{ inputs.ipa_url }}" --no-verbose -O ${{ github.workspace }}/youtube.ipa
+          wget "${{ github.event.inputs.ipa_url }}" -O youtube.ipa
 
-          file_type=$(file --mime-type -b ${{ github.workspace }}/youtube.ipa)
-
+          file_type=$(file --mime-type -b youtube.ipa)
           if [[ "$file_type" != "application/x-ios-app" && "$file_type" != "application/zip" ]]; then
             echo "::error::Validation failed: The downloaded file is not a valid IPA. Detected type: $file_type."
             exit 1
           fi
 
       - name: Install Dependencies
-        run: brew install make ldid
+        run: |
+          brew install make ldid wget
+          pip3 install pipx
+          pipx install --force https://github.com/asdfzxcvbn/pyzule-rw/archive/main.zip
 
       - name: Set PATH environment variable
         run: echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH
 
-      - name: Cache Theos
-        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_demc || inputs.enable_ytabconfig || inputs.enable_youmute || inputs.enable_ytnotracking || inputs.enable_youremembercaption || inputs.enable_noytpremium || inputs.enable_youtimestamp }}
-        id: theos
-        uses: actions/cache@v4
-        env:
-          cache-name: theos_cache_67db2ab
-        with:
-          path: theos/
-          key: ${{ env.cache-name }}
-          restore-keys: ${{ env.cache-name }}
-
       - name: Setup Theos
-        if: ${{ (inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_demc || inputs.enable_ytabconfig || inputs.enable_youmute || inputs.enable_ytnotracking || inputs.enable_youremembercaption || inputs.enable_noytpremium || inputs.enable_youtimestamp) && steps.theos.outputs.cache-hit != 'true' }}
-        uses: actions/checkout@v4.1.7
+        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_youmute || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp }}
+        uses: actions/checkout@v4
         with:
           repository: theos/theos
           ref: 67db2ab8d950910161730de77c322658ea3e6b44
-          path: ${{ github.workspace }}/theos
-          submodules: recursive
+          path: theos
 
       - name: Download iOS SDK
-        if: ${{ (inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_demc || inputs.enable_ytabconfig || inputs.enable_youmute || inputs.enable_ytnotracking || inputs.enable_youremembercaption || inputs.enable_noytpremium || inputs.enable_youtimestamp) && steps.theos.outputs.cache-hit != 'true' }}
+        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_youmute || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp }}
         run: |
           git clone --quiet -n --depth=1 --filter=tree:0 https://github.com/theos/sdks/
           cd sdks
           git sparse-checkout set --no-cone iPhoneOS16.5.sdk
           git checkout
-          mv *.sdk $THEOS/sdks
-        env:
-          THEOS: ${{ github.workspace }}/theos
+          mv *.sdk theos/sdks/
 
-      - name: Install cyan
-        run: pipx install --force https://github.com/asdfzxcvbn/pyzule-rw/archive/main.zip
-
-      - name: Download YouTube Plus
-        id: download_ytp
+      - name: Download YouTube Plus Tweak
         run: |
-          deb_url="https://github.com/dayanch96/YTLite/releases/download/v${{ inputs.tweak_version }}/com.dvntm.ytlite_${{ inputs.tweak_version }}_iphoneos-arm.deb"
-          wget "$deb_url" --no-verbose -O ${{ github.workspace }}/ytplus.deb
+          wget "https://github.com/dayanch96/YTLite/releases/download/v${{ github.event.inputs.tweak_version }}/com.dvntm.ytlite_${{ github.event.inputs.tweak_version }}_iphoneos-arm.deb" -O ytplus.deb
 
-      - name: Clone Open in YouTube (Safari extension)
+      - name: Clone Safari Extension
         run: |
           git clone --quiet -n --depth=1 --filter=tree:0 https://github.com/CokePokes/YoutubeExtensions/
           cd YoutubeExtensions
           git sparse-checkout set --no-cone OpenYoutubeSafariExtension.appex
           git checkout
-          mv *.appex ${{ github.workspace }}
+          mv *.appex ../
 
       - name: Clone YouTubeHeader
-        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_demc || inputs.enable_ytabconfig || inputs.enable_youmute || inputs.enable_ytnotracking || inputs.enable_youremembercaption || inputs.enable_noytpremium || inputs.enable_youtimestamp }}
+        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_youmute || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp }}
         run: |
-          if [ -d "$THEOS/include/YouTubeHeader" ]; then
-            echo "YouTubeHeader exists. Pulling latest changes..."
-            cd $THEOS/include/YouTubeHeader
-            git pull
-          else
-            echo "YouTubeHeader does not exist. Cloning repository..."
-            cd $THEOS/include
-            git clone --quiet --depth=1 https://github.com/PoomSmart/YouTubeHeader.git
+          mkdir -p theos/include
+          cd theos/include
+          git clone --quiet --depth=1 https://github.com/PoomSmart/YouTubeHeader.git
+          if [ "${{ github.event.inputs.enable_demc }}" = "true" ]; then
+            cp -r YouTubeHeader YTHeaders
           fi
-
-          if [ "${{ inputs.enable_demc }}" = "true" ]; then
-            echo "Copying YouTubeHeader to YTHeaders..."
-            rm -rf "$THEOS/include/YTHeaders"
-            cp -r "$THEOS/include/YouTubeHeader" "$THEOS/include/YTHeaders"
-          fi
-        env:
-          THEOS: ${{ github.workspace }}/theos
 
       - name: Clone PSHeader
-        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_demc || inputs.enable_ytabconfig || inputs.enable_youmute || inputs.enable_ytnotracking || inputs.enable_youremembercaption || inputs.enable_noytpremium || inputs.enable_youtimestamp }}
+        if: ${{ github.event.inputs.enable_youpip || github.event.inputs.enable_ytuhd || github.event.inputs.enable_yq || github.event.inputs.enable_ryd || github.event.inputs.enable_demc || github.event.inputs.enable_ytabconfig || github.event.inputs.enable_youmute || github.event.inputs.enable_ytnotracking || github.event.inputs.enable_youremembercaption || github.event.inputs.enable_noytpremium || github.event.inputs.enable_youtimestamp }}
         run: |
-          if [ -d "$THEOS/include/PSHeader" ]; then
-            echo "PSHeader exists. Pulling latest changes..."
-            cd $THEOS/include/PSHeader
-            git pull
-          else
-            echo "PSHeader does not exist. Cloning repository..."
-            cd $THEOS/include
-            git clone --quiet --depth=1 https://github.com/PoomSmart/PSHeader.git
+          cd theos/include
+          git clone --quiet --depth=1 https://github.com/PoomSmart/PSHeader.git
+
+      - name: Clone Tweaks
+        run: |
+          if [ "${{ github.event.inputs.enable_youpip }}" = "true" ]; then
+            git clone --quiet --depth=1 https://github.com/PoomSmart/YouPiP.git
           fi
-        env:
-          THEOS: ${{ github.workspace }}/theos
+          if [ "${{ github.event.inputs.enable_ytuhd }}" = "true" ]; then
+            git clone --quiet --depth=1 https://github.com/PoomSmart/YTUHD.git
+          fi
+          if [ "${{ github.event.inputs.enable_ryd }}" = "true" ]; then
+            git clone --quiet --depth=1 https://github.com/PoomSmart/Return-YouTube-Dislikes.git
+          fi
+          if [ "${{ github.event.inputs.enable_demc }}" = "true" ]; then
+            git clone --quiet --depth=1 https://github.com/PoomSmart/YouGroupSettings.git
+            git clone --quiet --depth=1 --recurse-submodules https://github.com/therealFoxster/DontEatMyContent.git
+          fi
+          if [ "${{ github.event.inputs.enable_yq }}" = "true" ]; then
+            git clone --quiet --depth=1 https://github.com/PoomSmart/YouQuality.git
+          fi
+          if [ "${{ github.event.inputs.enable_yq }}" = "true" ] || [ "${{ github.event.inputs.enable_youpip }}" = "true" ]; then
+            git clone --quiet --depth=1 https://github.com/PoomSmart/YTVideoOverlay.git
+          fi
+          if [ "${{ github.event.inputs.enable_ytabconfig }}" = "true" ]; then
+            git clone --quiet --depth=1 https://github.com/PoomSmart/YTABConfig.git
+          fi
+          if [ "${{ github.event.inputs.enable_youmute }}" = "true" ]; then
+            git clone --quiet --depth=1 https://github.com/PoomSmart/YouMute.git
+          fi
+          if [ "${{ github.event.inputs.enable_ytnotracking }}" = "true" ]; then
+            git clone --quiet --depth=1 https://github.com/PoomSmart/YTNoTracking.git
+          fi
+          if [ "${{ github.event.inputs.enable_youremembercaption }}" = "true" ]; then
+            git clone --quiet --depth=1 https://github.com/PoomSmart/YouRememberCaption.git
+          fi
+          if [ "${{ github.event.inputs.enable_noytpremium }}" = "true" ]; then
+            git clone --quiet --depth=1 https://github.com/PoomSmart/NoYtPremium.git
+          fi
+          if [ "${{ github.event.inputs.enable_youtimestamp }}" = "true" ]; then
+            git clone --quiet --depth=1 https://github.com/PoomSmart/YouTimeStamp.git
+          fi
 
-      - name: Clone YouPiP
-        if: ${{ inputs.enable_youpip }}
+      - name: Build Tweaks
         run: |
-          cd ${{ github.workspace }}
-          git clone --quiet --depth=1 https://github.com/PoomSmart/YouPiP.git
+          export THEOS=$PWD/theos
+          
+          if [ "${{ github.event.inputs.enable_youpip }}" = "true" ]; then
+            cd YouPiP && make clean package DEBUG=0 FINALPACKAGE=1 && mv packages/*.deb ../youpip.deb && cd ..
+          fi
+          if [ "${{ github.event.inputs.enable_ytuhd }}" = "true" ]; then
+            cd YTUHD && make clean package DEBUG=0 FINALPACKAGE=1 && mv packages/*.deb ../ytuhd.deb && cd ..
+          fi
+          if [ "${{ github.event.inputs.enable_ryd }}" = "true" ]; then
+            cd Return-YouTube-Dislikes && make clean package DEBUG=0 FINALPACKAGE=1 && mv packages/*.deb ../ryd.deb && cd ..
+          fi
+          if [ "${{ github.event.inputs.enable_demc }}" = "true" ]; then
+            cd YouGroupSettings && make clean package DEBUG=0 FINALPACKAGE=1 && mv packages/*.deb ../ygs.deb && cd ..
+            cd DontEatMyContent && make clean package DEBUG=0 FINALPACKAGE=1 && mv packages/*.deb ../demc.deb && cd ..
+          fi
+          if [ "${{ github.event.inputs.enable_yq }}" = "true" ]; then
+            cd YouQuality && make clean package DEBUG=0 FINALPACKAGE=1 && mv packages/*.deb ../yq.deb && cd ..
+          fi
+          if [ "${{ github.event.inputs.enable_yq }}" = "true" ] || [ "${{ github.event.inputs.enable_youpip }}" = "true" ]; then
+            cd YTVideoOverlay && make clean package DEBUG=0 FINALPACKAGE=1 && mv packages/*.deb ../ytvo.deb && cd ..
+          fi
+          if [ "${{ github.event.inputs.enable_ytabconfig }}" = "true" ]; then
+            cd YTABConfig && make clean package DEBUG=0 FINALPACKAGE=1 && mv packages/*.deb ../ytabconfig.deb && cd ..
+          fi
+          if [ "${{ github.event.inputs.enable_youmute }}" = "true" ]; then
+            cd YouMute && make clean package DEBUG=0 FINALPACKAGE=1 && mv packages/*.deb ../youmute.deb && cd ..
+          fi
+          if [ "${{ github.event.inputs.enable_ytnotracking }}" = "true" ]; then
+            cd YTNoTracking && make clean package DEBUG=0 FINALPACKAGE=1 && mv packages/*.deb ../ytnotracking.deb && cd ..
+          fi
+          if [ "${{ github.event.inputs.enable_youremembercaption }}" = "true" ]; then
+            cd YouRememberCaption && make clean package DEBUG=0 FINALPACKAGE=1 && mv packages/*.deb ../youremembercaption.deb && cd ..
+          fi
+          if [ "${{ github.event.inputs.enable_noytpremium }}" = "true" ]; then
+            cd NoYtPremium && make clean package DEBUG=0 FINALPACKAGE=1 && mv packages/*.deb ../noytpremium.deb && cd ..
+          fi
+          if [ "${{ github.event.inputs.enable_youtimestamp }}" = "true" ]; then
+            cd YouTimeStamp && make clean package DEBUG=0 FINALPACKAGE=1 && mv packages/*.deb ../youtimestamp.deb && cd ..
+          fi
 
-      - name: Clone YTUHD
-        if: ${{ inputs.enable_ytuhd }}
-        uses: actions/checkout@v4.1.7
-        with:
-          repository: PoomSmart/YTUHD
-          ref: 0f59b38817d554ab692a0053456319847a6ab1a1
-          path: ${{ github.workspace }}/YTUHD
-
-      - name: Clone Return-YouTube-Dislikes
-        if: ${{ inputs.enable_ryd }}
-        run: |
-          cd ${{ github.workspace }}
-          git clone --quiet --depth=1 https://github.com/PoomSmart/Return-YouTube-Dislikes.git
-
-      - name: Clone YouGroupSettings
-        if: ${{ inputs.enable_demc }}
-        run: |
-          cd ${{ github.workspace }}
-          git clone --quiet --depth=1 https://github.com/PoomSmart/YouGroupSettings.git
-
-      - name: Clone YouQuality
-        if: ${{ inputs.enable_yq }}
-        run: |
-          cd ${{ github.workspace }}
-          git clone --quiet --depth=1 https://github.com/PoomSmart/YouQuality.git
-
-      - name: Clone YTVideoOverlay
-        if: ${{ inputs.enable_yq || inputs.enable_youpip }}
-        run: |
-          cd ${{ github.workspace }}
-          git clone --quiet --depth=1 https://github.com/PoomSmart/YTVideoOverlay.git
-
-      - name: Clone DontEatMyContent
-        if: ${{ inputs.enable_demc }}
-        run: |
-          cd ${{ github.workspace }}
-          git clone --quiet --depth=1 --recurse-submodules https://github.com/therealFoxster/DontEatMyContent.git
-
-      - name: Clone YTABConfig
-        if: ${{ inputs.enable_ytabconfig }}
-        run: |
-          cd ${{ github.workspace }}
-          git clone --quiet --depth=1 https://github.com/PoomSmart/YTABConfig.git
-
-      - name: Clone YouMute
-        if: ${{ inputs.enable_youmute }}
-        run: |
-          cd ${{ github.workspace }}
-          git clone --quiet --depth=1 https://github.com/PoomSmart/YouMute.git
-
-      - name: Clone YTNoTracking
-        if: ${{ inputs.enable_ytnotracking }}
-        run: |
-          cd ${{ github.workspace }}
-          git clone --quiet --depth=1 https://github.com/PoomSmart/YTNoTracking.git
-
-      - name: Clone YouRememberCaption
-        if: ${{ inputs.enable_youremembercaption }}
-        run: |
-          cd ${{ github.workspace }}
-          git clone --quiet --depth=1 https://github.com/PoomSmart/YouRememberCaption.git
-
-      - name: Clone NoYtPremium
-        if: ${{ inputs.enable_noytpremium }}
-        run: |
-          cd ${{ github.workspace }}
-          git clone --quiet --depth=1 https://github.com/PoomSmart/NoYtPremium.git
-
-      - name: Clone YouTimeStamp
-        if: ${{ inputs.enable_youtimestamp }}
-        run: |
-          cd ${{ github.workspace }}
-          git clone --quiet --depth=1 https://github.com/PoomSmart/YouTimeStamp.git
-
-      - name: Build YouPiP
-        if: ${{ inputs.enable_youpip }}
-        run: |
-          cd ${{ github.workspace }}/YouPiP
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/youpip.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Build YTUHD
-        if: ${{ inputs.enable_ytuhd }}
-        run: |
-          cd ${{ github.workspace }}/YTUHD
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/ytuhd.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Build Return-YouTube-Dislikes
-        if: ${{ inputs.enable_ryd }}
-        run: |
-          cd ${{ github.workspace }}/Return-YouTube-Dislikes
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/ryd.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Build YouGroupSettings
-        if: ${{ inputs.enable_demc }}
-        run: |
-          cd ${{ github.workspace }}/YouGroupSettings
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/ygs.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Build YouQuality
-        if: ${{ inputs.enable_yq }}
-        run: |
-          cd ${{ github.workspace }}/YouQuality
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/yq.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Build YTVideoOverlay
-        if: ${{ inputs.enable_yq || inputs.enable_youpip }}
-        run: |
-          cd ${{ github.workspace }}/YTVideoOverlay
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/ytvo.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Build DontEatMyContent
-        if: ${{ inputs.enable_demc }}
-        run: |
-          cd ${{ github.workspace }}/DontEatMyContent
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/demc.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Build YTABConfig
-        if: ${{ inputs.enable_ytabconfig }}
-        run: |
-          cd ${{ github.workspace }}/YTABConfig
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/ytabconfig.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Build YouMute
-        if: ${{ inputs.enable_youmute }}
-        run: |
-          cd ${{ github.workspace }}/YouMute
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/youmute.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Build YTNoTracking
-        if: ${{ inputs.enable_ytnotracking }}
-        run: |
-          cd ${{ github.workspace }}/YTNoTracking
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/ytnotracking.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Build YouRememberCaption
-        if: ${{ inputs.enable_youremembercaption }}
-        run: |
-          cd ${{ github.workspace }}/YouRememberCaption
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/youremembercaption.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Build NoYtPremium
-        if: ${{ inputs.enable_noytpremium }}
-        run: |
-          cd ${{ github.workspace }}/NoYtPremium
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/noytpremium.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Build YouTimeStamp
-        if: ${{ inputs.enable_youtimestamp }}
-        run: |
-          cd ${{ github.workspace }}/YouTimeStamp
-          make clean package DEBUG=0 FINALPACKAGE=1
-          mv packages/*.deb ${{ github.workspace }}/youtimestamp.deb
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
-      - name: Inject tweaks into IPA
+      - name: Inject Tweaks into IPA
         run: |
           tweaks="ytplus.deb OpenYoutubeSafariExtension.appex"
-
           for f in *.deb; do
-            if [ -f "$f" ]; then
+            if [ -f "$f" ] && [ "$f" != "ytplus.deb" ]; then
               tweaks="$tweaks $f"
             fi
           done
+          
+          cyan -i youtube.ipa -o YouTubePlus_${{ github.event.inputs.tweak_version }}.ipa -uwef $tweaks -n "${{ github.event.inputs.display_name }}" -b "${{ github.event.inputs.bundle_id }}"
 
-          cyan -i youtube.ipa -o YouTubePlus_${{ inputs.tweak_version }}.ipa -uwef $tweaks -n "${{ inputs.display_name }}" -b ${{ inputs.bundle_id }}
-
-      - name: Upload to GitHub Releases
-        uses: softprops/action-gh-release@v2.0.1
+      - name: Upload IPA to Releases
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ytp-${{ github.run_number }}
-          name: YouTubePlus v${{ inputs.tweak_version }} (${{ github.run_number }})
-          files: YouTubePlus_${{ inputs.tweak_version }}.ipa
+          files: YouTubePlus_${{ github.event.inputs.tweak_version }}.ipa
           draft: true
 
       - name: Output Release URL
-        run: |
-          echo "::notice::Release available at: https://github.com/${{ github.repository }}/releases"
+        run: echo "::notice::Release available at: https://github.com/${{ github.repository }}/releases"
