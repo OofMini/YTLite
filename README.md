@@ -1,3 +1,10 @@
+My sidestore and trollapps repos for easy updates.
+
+SideStore Manifest: https://OofMini.github.io/Minis-IPA-Repo/sidestore.json
+ 
+TrollApps Manifest: https://OofMini.github.io/Minis-IPA-Repo/trollapps.json
+
+
 # YouTube Plus (ex. YTLite)
 A flexible enhancer for YouTube on iOS, featuring over hundred customizable options.
 
