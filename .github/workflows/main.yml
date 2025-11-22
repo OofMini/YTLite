@@ -53,7 +53,7 @@ on:
 
       bundle_id:
         description: "BundleID (Optional)"
-        default: "com.github.ytlite.youtube"
+        default: "com.google.ios.youtube"
         required: true
         type: string
 
