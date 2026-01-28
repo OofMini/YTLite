@@ -1,3 +1,10 @@
+My sidestore and trollapps repos for updates.
+| Client        | Source URL                                            |
+| :------------ | :---------------------------------------------------- |
+| **SideStore** | `https://OofMini.github.io/Minis-Repo/sidestore.json` |
+| **TrollApps** | `https://OofMini.github.io/Minis-Repo/trollapps.json` |
+| **Web View**  | [Launch PWA](https://OofMini.github.io/Minis-Repo/)   |
+
 # YouTube Plus (ex. YTLite)
 A flexible enhancer for YouTube on iOS, featuring over hundred customizable options.
 
