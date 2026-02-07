@@ -1,5 +1,3 @@
-My repo for updates.                                             
-| :------------ | :---------------------------------------------------- |
 | **Repo**      | `https://OofMini.github.io/Minis-Repo/mini.json`      |
 | **Web View**  | [Launch PWA](https://OofMini.github.io/Minis-Repo/)   |
 
