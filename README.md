@@ -1,7 +1,7 @@
 My repo for updates.
 | Client        | Source URL                                            |
 | :------------ | :---------------------------------------------------- |
-| **Repo** | `https://OofMini.github.io/Minis-Repo/mini.json` |
+| **Repo**      | `https://OofMini.github.io/Minis-Repo/mini.json`      |
 | **Web View**  | [Launch PWA](https://OofMini.github.io/Minis-Repo/)   |
 
 # YouTube Plus (ex. YTLite)
