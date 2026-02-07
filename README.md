@@ -1,8 +1,7 @@
-My sidestore and trollapps repos for updates.
+My repo for updates.
 | Client        | Source URL                                            |
 | :------------ | :---------------------------------------------------- |
-| **SideStore** | `https://OofMini.github.io/Minis-Repo/sidestore.json` |
-| **TrollApps** | `https://OofMini.github.io/Minis-Repo/trollapps.json` |
+| **repo** | `https://OofMini.github.io/Minis-Repo/sidestore.json` |
 | **Web View**  | [Launch PWA](https://OofMini.github.io/Minis-Repo/)   |
 
 # YouTube Plus (ex. YTLite)
