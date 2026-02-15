@@ -21,11 +21,17 @@ static NSString *accessGroupID() {
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, (CFTypeRef *)&result);
     if (status == errSecItemNotFound)
         status = SecItemAdd((__bridge CFDictionaryRef)query, (CFTypeRef *)&result);
-        if (status != errSecSuccess)
+        if (status != errSecSuccess) {
+            if (result) CFRelease(result);
             return nil;
+        }
     NSString *accessGroup = [(__bridge NSDictionary *)result objectForKey:(__bridge NSString *)kSecAttrAccessGroup];
 
-    return accessGroup;
+    // Retain the string before releasing the CF dictionary
+    NSString *retainedGroup = [accessGroup copy];
+    if (result) CFRelease(result);
+
+    return retainedGroup;
 }
 
 // IAmYouTube (https://github.com/PoomSmart/IAmYouTube/)
@@ -73,6 +79,7 @@ static NSString *accessGroupID() {
 
 BOOL isSelf() {
     NSArray *address = [NSThread callStackReturnAddresses];
+    if (address.count < 3) return NO;
     Dl_info info = {0};
     if (dladdr((void *)[address[2] longLongValue], &info) == 0) return NO;
     NSString *path = [NSString stringWithUTF8String:info.dli_fname];
