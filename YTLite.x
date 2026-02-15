@@ -479,9 +479,13 @@ void autoSkipShorts(YTPlayerViewController *self, YTSingleVideoController *video
     NetworkStatus status = [[Reachability reachabilityForInternetConnection] currentReachabilityStatus];
     NSInteger kQualityIndex = status == ReachableViaWiFi ? ytlInt(@"wiFiQualityIndex") : ytlInt(@"cellQualityIndex");
 
-    NSString *bestQualityLabel;
+    // FIX: Guard against empty selectableVideoFormats to prevent nil insertion crash
+    NSArray *formats = self.activeVideo.selectableVideoFormats;
+    if (formats.count == 0) return;
+
+    NSString *bestQualityLabel = nil;
     int highestResolution = 0;
-    for (MLFormat *format in self.activeVideo.selectableVideoFormats) {
+    for (MLFormat *format in formats) {
         int reso = format.singleDimensionResolution;
         if (reso > highestResolution) {
             highestResolution = reso;
@@ -489,14 +493,22 @@ void autoSkipShorts(YTPlayerViewController *self, YTSingleVideoController *video
         }
     }
 
+    // FIX: If we still couldn't determine best quality, bail out
+    if (!bestQualityLabel) return;
+
+    // FIX: Build array safely — bestQualityLabel is now guaranteed non-nil
     NSArray *qualityLabels = @[@"Default", bestQualityLabel, @"2160p60", @"2160p", @"1440p60", @"1440p", @"1080p60", @"1080p", @"720p60", @"720p", @"480p", @"360p"];
+
+    // FIX: Bounds-check kQualityIndex
+    if (kQualityIndex < 0 || kQualityIndex >= (NSInteger)qualityLabels.count) return;
+
     NSString *qualityLabel = qualityLabels[kQualityIndex];
 
     if (![qualityLabel isEqualToString:bestQualityLabel]) {
         BOOL exactMatch = NO;
         NSString *closestQualityLabel = qualityLabel;
 
-        for (MLFormat *format in self.activeVideo.selectableVideoFormats) {
+        for (MLFormat *format in formats) {
             if ([format.qualityLabel isEqualToString:qualityLabel]) {
                 exactMatch = YES;
                 break;
@@ -506,7 +518,7 @@ void autoSkipShorts(YTPlayerViewController *self, YTSingleVideoController *video
         if (!exactMatch) {
             NSInteger bestQualityDifference = NSIntegerMax;
 
-            for (MLFormat *format in self.activeVideo.selectableVideoFormats) {
+            for (MLFormat *format in formats) {
                 NSArray *formatСomponents = [format.qualityLabel componentsSeparatedByString:@"p"];
                 NSArray *targetComponents = [qualityLabel componentsSeparatedByString:@"p"];
                 if (formatСomponents.count == 2) {
@@ -889,8 +901,10 @@ static void downloadImageFromURL(UIResponder *responder, NSURL *URL, BOOL downlo
                     [[%c(YTToastResponderEvent) eventWithMessage:success ? LOC(@"Saved") : [NSString stringWithFormat:LOC(@"%@: %@"), LOC(@"Error"), error.localizedDescription] firstResponder:responder] send];
                 }];
             } else {
-                [UIPasteboard generalPasteboard].image = [UIImage imageWithData:data];
-                [[%c(YTToastResponderEvent) eventWithMessage:LOC(@"Copied") firstResponder:responder] send];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [UIPasteboard generalPasteboard].image = [UIImage imageWithData:data];
+                    [[%c(YTToastResponderEvent) eventWithMessage:LOC(@"Copied") firstResponder:responder] send];
+                });
             }
         } else {
             [[%c(YTToastResponderEvent) eventWithMessage:[NSString stringWithFormat:LOC(@"%@: %@"), LOC(@"Error"), error.localizedDescription] firstResponder:responder] send];
@@ -1020,23 +1034,34 @@ static void genImageFromLayer(CALayer *layer, UIColor *backgroundColor, void (^c
                     NSString *newURLString = [URLString stringByReplacingCharactersInRange:NSMakeRange(sizeRange.location + 2, dashRange.location - sizeRange.location - 2) withString:@"1024"];
                     NSURL *PFPURL = [NSURL URLWithString:newURLString];
 
-                    UIImage *image = [UIImage imageWithData:[NSData dataWithContentsOfURL:PFPURL]];
-                    if (image) {
-                        YTDefaultSheetController *sheetController = [%c(YTDefaultSheetController) sheetControllerWithParentResponder:nil];
-    
-                        [sheetController addAction:[%c(YTActionSheetAction) actionWithTitle:LOC(@"SaveProfilePicture") iconImage:YTImageNamed(@"yt_outline_image_24pt") style:0 handler:^ {
-                            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
+                    // FIX: Download asynchronously to avoid blocking the main thread
+                    __weak typeof(self) weakSelf = self;
+                    NSURLSession *session = [NSURLSession sharedSession];
+                    [[session dataTaskWithURL:PFPURL completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                        if (!data) return;
+                        UIImage *image = [UIImage imageWithData:data];
+                        if (!image) return;
 
-                            [[%c(YTToastResponderEvent) eventWithMessage:LOC(@"Saved") firstResponder:self.keepalive_node.closestViewController] send];
-                        }]];
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            __strong typeof(weakSelf) strongSelf = weakSelf;
+                            if (!strongSelf) return;
 
-                        [sheetController addAction:[%c(YTActionSheetAction) actionWithTitle:LOC(@"CopyProfilePicture") iconImage:YTImageNamed(@"yt_outline_library_image_24pt") style:0 handler:^ {
-                            [UIPasteboard generalPasteboard].image = image;
-                            [[%c(YTToastResponderEvent) eventWithMessage:LOC(@"Copied") firstResponder:self.keepalive_node.closestViewController] send];
-                        }]];
+                            YTDefaultSheetController *sheetController = [%c(YTDefaultSheetController) sheetControllerWithParentResponder:nil];
 
-                        [sheetController presentFromViewController:self.keepalive_node.closestViewController animated:YES completion:nil];
-                    }
+                            [sheetController addAction:[%c(YTActionSheetAction) actionWithTitle:LOC(@"SaveProfilePicture") iconImage:YTImageNamed(@"yt_outline_image_24pt") style:0 handler:^ {
+                                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
+
+                                [[%c(YTToastResponderEvent) eventWithMessage:LOC(@"Saved") firstResponder:strongSelf.keepalive_node.closestViewController] send];
+                            }]];
+
+                            [sheetController addAction:[%c(YTActionSheetAction) actionWithTitle:LOC(@"CopyProfilePicture") iconImage:YTImageNamed(@"yt_outline_library_image_24pt") style:0 handler:^ {
+                                [UIPasteboard generalPasteboard].image = image;
+                                [[%c(YTToastResponderEvent) eventWithMessage:LOC(@"Copied") firstResponder:strongSelf.keepalive_node.closestViewController] send];
+                            }]];
+
+                            [sheetController presentFromViewController:strongSelf.keepalive_node.closestViewController animated:YES completion:nil];
+                        });
+                    }] resume];
                 }
             }
         }
@@ -1046,11 +1071,13 @@ static void genImageFromLayer(CALayer *layer, UIColor *backgroundColor, void (^c
 %new
 - (void)postManager:(UILongPressGestureRecognizer *)sender {
     if (sender.state == UIGestureRecognizerStateBegan) {
-        ELMContainerNode *nodeForLayer = (ELMContainerNode *)self.keepalive_node.yogaChildren[0];
+        // FIX: Bounds-check yogaChildren before accessing index 0
+        NSArray *yogaChildren = self.keepalive_node.yogaChildren;
+        ELMContainerNode *nodeForLayer = (yogaChildren.count > 0) ? (ELMContainerNode *)yogaChildren[0] : nil;
         ELMContainerNode *containerNode = (ELMContainerNode *)self.keepalive_node;
         NSString *text = containerNode.copiedComment;
         NSURL *URL = containerNode.copiedURL;
-        CALayer *layer = nodeForLayer.layer;
+        CALayer *layer = nodeForLayer ? nodeForLayer.layer : containerNode.layer;
         UIColor *backgroundColor = containerNode.closestViewController.view.backgroundColor;
 
         YTDefaultSheetController *sheetController = [%c(YTDefaultSheetController) sheetControllerWithParentResponder:nil];
