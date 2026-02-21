@@ -581,7 +581,14 @@ static NSString *GetCacheSize() {
                 [%c(YTSettingsSectionItem) itemWithTitle:LOC(@"ClearCache") titleDescription:nil accessibilityIdentifier:@"YTLiteSectionItem" detailTextBlock:^NSString *() { return GetCacheSize(); } selectBlock:^BOOL (YTSettingsCell *cell, NSUInteger arg1) {
                     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
                         NSString *cachePath = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).firstObject;
-                        [[NSFileManager defaultManager] removeItemAtPath:cachePath error:nil];
+                        NSFileManager *fm = [NSFileManager defaultManager];
+
+                        // Remove contents instead of the directory itself to prevent
+                        // the Caches directory from disappearing and causing write failures
+                        NSArray *contents = [fm contentsOfDirectoryAtPath:cachePath error:nil];
+                        for (NSString *item in contents) {
+                            [fm removeItemAtPath:[cachePath stringByAppendingPathComponent:item] error:nil];
+                        }
                     });
 
                     [[%c(YTToastResponderEvent) eventWithMessage:LOC(@"Done") firstResponder:[self parentResponder]] send];

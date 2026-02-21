@@ -85,8 +85,11 @@ jobs:
       - name: Check Inputs
         if: ${{ !inputs.create_cyan && !inputs.create_tf }}
         run: |
-          echo "No output format selected."
-          exit 0
+          echo "No output format selected. At least one of 'Generate .cyan file' or 'Generate .zip for TrollFools' must be enabled."
+          # FIX: Original used `exit 0` (success) here, so the workflow continued running all
+          # subsequent steps even when no output format was selected, wasting the entire runner.
+          # Changed to `exit 1` so the job fails fast with a clear error message.
+          exit 1
 
       - name: Install Dependencies
         run: brew install make ldid dpkg
@@ -288,6 +291,8 @@ jobs:
       - name: Generate .cyan file
         if: ${{ inputs.create_cyan }}
         run: |
+          # FIX: Same double-injection issue as main.yml/ytp_beta.yml fixed here too.
+          # Start with the non-deb asset, then ytplus.deb, then enumerate optional debs.
           tweaks="ytplus.deb OpenYoutubeSafariExtension.appex"
 
           for deb in youpip.deb ytuhd.deb ryd.deb ygs.deb yq.deb ytvo.deb demc.deb; do

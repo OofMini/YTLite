@@ -28,7 +28,14 @@
 #import "../protobuf/objectivec/GPBUnknownField.h"
 #import "../protobuf/objectivec/GPBUnknownFieldSet.h"
 
-#define ytlBool(key)  [[[NSUserDefaults alloc] initWithSuiteName:@"com.dvntm.ytlite"] boolForKey:key]
+// FIX: The original macro `[[[NSUserDefaults alloc] initWithSuiteName:...] boolForKey:key]`
+// allocated a brand-new NSUserDefaults instance on EVERY macro invocation. NSUserDefaults
+// initialization is not free — it hits the filesystem and involves IPC to cfprefsd.
+// Creating a new instance on every predicate check inside a hot path (share-sheet command
+// execution) is wasteful. Use the YTLUserDefaults singleton defined in the main tweak
+// instead, which is already kept alive for the process lifetime.
+#import "Utils/YTLUserDefaults.h"
+#define ytlBool(key) [[YTLUserDefaults standardUserDefaults] boolForKey:(key)]
 
 @interface CustomGPBMessage : GPBMessage
 + (instancetype)deserializeFromString:(NSString *)string;

@@ -21,9 +21,16 @@ static NSString *accessGroupID() {
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, (CFTypeRef *)&result);
     if (status == errSecItemNotFound)
         status = SecItemAdd((__bridge CFDictionaryRef)query, (CFTypeRef *)&result);
-        if (status != errSecSuccess)
-            return nil;
-    NSString *accessGroup = [(__bridge NSDictionary *)result objectForKey:(__bridge NSString *)kSecAttrAccessGroup];
+    if (status != errSecSuccess)
+        return nil;
+
+    // FIX: The original code returned `accessGroup` without ever calling CFRelease on `result`.
+    // SecItemCopyMatching and SecItemAdd both return a retained CFDictionaryRef that the caller
+    // owns. Not releasing it causes a memory leak on every call to accessGroupID() (which is
+    // called on every keychain access during login). Use __bridge_transfer to hand ownership
+    // to ARC so the dictionary is released when the local NSDictionary goes out of scope.
+    NSDictionary *resultDict = (__bridge_transfer NSDictionary *)result;
+    NSString *accessGroup = [resultDict objectForKey:(__bridge NSString *)kSecAttrAccessGroup];
 
     return accessGroup;
 }

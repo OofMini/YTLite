@@ -418,8 +418,10 @@ void autoSkipShorts(YTPlayerViewController *self, YTSingleVideoController *video
         if ([self.parentViewController isKindOfClass:%c(YTShortsPlayerViewController)]) {
             YTShortsPlayerViewController *shortsVC = (YTShortsPlayerViewController *)self.parentViewController;
 
+            // FIX: performSelector: without an argument on a method that requires one causes
+            // an "unrecognized selector" crash. Pass nil explicitly via withObject:.
             if ([shortsVC respondsToSelector:@selector(reelContentViewRequestsAdvanceToNextVideo:)]) {
-                [shortsVC performSelector:@selector(reelContentViewRequestsAdvanceToNextVideo:)];
+                [shortsVC performSelector:@selector(reelContentViewRequestsAdvanceToNextVideo:) withObject:nil];
             }
         }
     }
@@ -466,7 +468,12 @@ void autoSkipShorts(YTPlayerViewController *self, YTSingleVideoController *video
         YTMainAppVideoPlayerOverlayViewController *overlayVC = (YTMainAppVideoPlayerOverlayViewController *)self.activeVideoPlayerOverlay;
 
         NSArray *speedLabels = @[@0.25, @0.5, @0.75, @1.0, @1.25, @1.5, @1.75, @2.0, @3.0, @4.0, @5.0];
-        [overlayVC setPlaybackRate:[speedLabels[ytlInt(@"autoSpeedIndex")] floatValue]];
+
+        // FIX: Bounds-check the index before array access to prevent crash on corrupted prefs.
+        NSInteger speedIndex = ytlInt(@"autoSpeedIndex");
+        if (speedIndex < 0 || speedIndex >= (NSInteger)speedLabels.count) return;
+
+        [overlayVC setPlaybackRate:[speedLabels[speedIndex] floatValue]];
     }
 }
 
@@ -507,10 +514,13 @@ void autoSkipShorts(YTPlayerViewController *self, YTSingleVideoController *video
             NSInteger bestQualityDifference = NSIntegerMax;
 
             for (MLFormat *format in self.activeVideo.selectableVideoFormats) {
-                NSArray *formatСomponents = [format.qualityLabel componentsSeparatedByString:@"p"];
+                // FIX: Renamed from 'formatСomponents' (contained Cyrillic С U+0421) to
+                // 'formatComponents' (all Latin). The Cyrillic character is visually identical
+                // but a different Unicode codepoint, causing hidden inconsistency.
+                NSArray *formatComponents = [format.qualityLabel componentsSeparatedByString:@"p"];
                 NSArray *targetComponents = [qualityLabel componentsSeparatedByString:@"p"];
-                if (formatСomponents.count == 2) {
-                    NSInteger formatQuality = [formatСomponents.firstObject integerValue];
+                if (formatComponents.count == 2) {
+                    NSInteger formatQuality = [formatComponents.firstObject integerValue];
                     NSInteger targetQuality = [targetComponents.firstObject integerValue];
                     NSInteger difference = labs(formatQuality - targetQuality);
                     if (difference < bestQualityDifference) {
@@ -530,17 +540,20 @@ void autoSkipShorts(YTPlayerViewController *self, YTSingleVideoController *video
     }
 }
 
+// FIX: addEndTime and autoSkipShorts were called from BOTH singleVideo:currentVideoTimeDidChange:
+// AND potentiallyMutatedSingleVideo:currentVideoTimeDidChange:, causing them to fire twice per
+// time tick. Route each helper to only one delegate method to prevent double-execution.
+// addEndTime is idempotent (guards with containsString) so double-firing wastes CPU but doesn't
+// corrupt state; autoSkipShorts however would call reelContentViewRequestsAdvanceToNextVideo:
+// twice, potentially skipping two shorts at once. Splitting them across the two callbacks
+// ensures each fires exactly once per time update.
 - (void)singleVideo:(YTSingleVideoController *)video currentVideoTimeDidChange:(YTSingleVideoTime *)time {
     %orig;
-
     addEndTime(self, video, time);
-    autoSkipShorts(self, video, time);
 }
 
 - (void)potentiallyMutatedSingleVideo:(YTSingleVideoController *)video currentVideoTimeDidChange:(YTSingleVideoTime *)time {
     %orig;
-
-    addEndTime(self, video, time);
     autoSkipShorts(self, video, time);
 }
 %end
@@ -670,7 +683,12 @@ static BOOL findCell(ASNodeController *nodeController, NSArray <NSString *> *ide
             return findCell(child, identifiers);
         }
 
-        return NO;
+        // FIX: The original code had `return NO` here at the bottom of the for-loop body,
+        // causing the function to return after examining only the FIRST child element.
+        // If the first child was neither ELMNodeController nor ASNodeController, NO was
+        // returned immediately and subsequent children were never checked. Changed to
+        // `continue` so all children in the loop are examined before concluding NO.
+        continue;
     }
     return NO;
 }
@@ -871,7 +889,8 @@ static void downloadImageFromURL(UIResponder *responder, NSURL *URL, BOOL downlo
     if ([URLString containsString:@"c-fcrop"]) {
         NSRange croppedURL = [URLString rangeOfString:@"c-fcrop"];
         if (croppedURL.location != NSNotFound) {
-            NSString *newURL = [URLString stringByReplacingOccurrencesOfString:[URLString substringFromIndex:croppedURL.location] withString:@"nd-v1"];
+            NSString *newURL = [URLString substringToIndex:croppedURL.location];
+            newURL = [newURL stringByAppendingString:@"nd-v1"];
             downloadURL = [NSURL URLWithString:newURL];
         }
     } else {
@@ -1020,23 +1039,33 @@ static void genImageFromLayer(CALayer *layer, UIColor *backgroundColor, void (^c
                     NSString *newURLString = [URLString stringByReplacingCharactersInRange:NSMakeRange(sizeRange.location + 2, dashRange.location - sizeRange.location - 2) withString:@"1024"];
                     NSURL *PFPURL = [NSURL URLWithString:newURLString];
 
-                    UIImage *image = [UIImage imageWithData:[NSData dataWithContentsOfURL:PFPURL]];
-                    if (image) {
-                        YTDefaultSheetController *sheetController = [%c(YTDefaultSheetController) sheetControllerWithParentResponder:nil];
-    
-                        [sheetController addAction:[%c(YTActionSheetAction) actionWithTitle:LOC(@"SaveProfilePicture") iconImage:YTImageNamed(@"yt_outline_image_24pt") style:0 handler:^ {
-                            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
+                    // FIX: The original code called [NSData dataWithContentsOfURL:] synchronously
+                    // on the main thread (this method is invoked from a UIGestureRecognizer handler).
+                    // Synchronous network I/O on the main thread causes UI freeze / ANR.
+                    // Moved to an async NSURLSession data task to keep the main thread free.
+                    UIResponder *responder = self.keepalive_node.closestViewController;
+                    NSURLSession *session = [NSURLSession sharedSession];
+                    [[session dataTaskWithURL:PFPURL completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                        if (!data) return;
+                        UIImage *image = [UIImage imageWithData:data];
+                        if (!image) return;
 
-                            [[%c(YTToastResponderEvent) eventWithMessage:LOC(@"Saved") firstResponder:self.keepalive_node.closestViewController] send];
-                        }]];
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            YTDefaultSheetController *sheetController = [%c(YTDefaultSheetController) sheetControllerWithParentResponder:nil];
 
-                        [sheetController addAction:[%c(YTActionSheetAction) actionWithTitle:LOC(@"CopyProfilePicture") iconImage:YTImageNamed(@"yt_outline_library_image_24pt") style:0 handler:^ {
-                            [UIPasteboard generalPasteboard].image = image;
-                            [[%c(YTToastResponderEvent) eventWithMessage:LOC(@"Copied") firstResponder:self.keepalive_node.closestViewController] send];
-                        }]];
+                            [sheetController addAction:[%c(YTActionSheetAction) actionWithTitle:LOC(@"SaveProfilePicture") iconImage:YTImageNamed(@"yt_outline_image_24pt") style:0 handler:^ {
+                                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
+                                [[%c(YTToastResponderEvent) eventWithMessage:LOC(@"Saved") firstResponder:responder] send];
+                            }]];
 
-                        [sheetController presentFromViewController:self.keepalive_node.closestViewController animated:YES completion:nil];
-                    }
+                            [sheetController addAction:[%c(YTActionSheetAction) actionWithTitle:LOC(@"CopyProfilePicture") iconImage:YTImageNamed(@"yt_outline_library_image_24pt") style:0 handler:^ {
+                                [UIPasteboard generalPasteboard].image = image;
+                                [[%c(YTToastResponderEvent) eventWithMessage:LOC(@"Copied") firstResponder:responder] send];
+                            }]];
+
+                            [sheetController presentFromViewController:(UIViewController *)responder animated:YES completion:nil];
+                        });
+                    }] resume];
                 }
             }
         }
@@ -1321,11 +1350,27 @@ static void manageSpeedmasterYTLite(UILongPressGestureRecognizer *gesture, YTMai
 
 %hook YTMainAppVideoPlayerOverlayView
 - (void)setSeekAnywherePanGestureRecognizer:(id)arg1 {
-    if (ytlInt(@"speedIndex") == 0) return %orig;
+    // FIX: The original code skipped calling %orig when speedIndex != 0, meaning the
+    // seek-anywhere pan gesture recognizer was never actually installed on the view.
+    // This broke the seek-anywhere feature whenever hold-to-speed was enabled.
+    // Additionally, the long-press gesture recognizer was added on every call with no
+    // deduplication, so each new video would stack another recognizer on the view.
+    // Fix: always call %orig, and guard against duplicate gesture recognizer addition.
+    %orig;
+
+    if (ytlInt(@"speedIndex") == 0) return;
+
+    // Only add our gesture recognizer if one isn't already present.
+    for (UIGestureRecognizer *gr in self.gestureRecognizers) {
+        if ([gr isKindOfClass:[UILongPressGestureRecognizer class]] &&
+            gr.action == @selector(speedmasterYtLite:)) {
+            return;
+        }
+    }
 
     UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(speedmasterYtLite:)];
     longPress.minimumPressDuration = 0.3;
-    if (ytlInt(@"speedIndex") != 0) [self addGestureRecognizer:longPress];
+    [self addGestureRecognizer:longPress];
 }
 
 %new
@@ -1373,12 +1418,6 @@ static NSURL *newCoverURL(NSURL *originalURL) {
     return %orig(newCoverURL(selectedImageURL), newCoverURL(updatedImageURL));
 }
 %end
-
-// %hook ELMImageDownloader
-// - (id)downloadImageWithURL:(id)arg1 targetSize:(CGSize)arg2 callbackQueue:(id)arg3 downloadProgress:(id)arg4 completion:(id)arg5 {
-//     return %orig(newCoverURL(arg1), arg2, arg3, arg4, arg5);
-// }
-// %end
 
 %ctor {
     if (ytlBool(@"shortsOnlyMode") && (ytlBool(@"removeShorts") || ytlBool(@"reExplore"))) {
