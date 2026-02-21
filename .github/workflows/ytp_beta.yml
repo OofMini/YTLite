@@ -300,11 +300,16 @@ jobs:
 
       - name: Inject tweaks into IPA
         run: |
+          # FIX: Original code initialized tweaks="ytplus.deb OpenYoutubeSafariExtension.appex"
+          # then ran `for f in *.deb` which re-matched ytplus.deb, injecting it twice.
+          # Injecting the same dylib twice causes symbol conflicts and runtime crashes.
+          # Fix: enumerate only the optional debs by explicit name so ytplus.deb is never
+          # added a second time.
           tweaks="ytplus.deb OpenYoutubeSafariExtension.appex"
 
-          for f in *.deb; do
-            if [ -f "$f" ]; then
-              tweaks="$tweaks $f"
+          for deb in youpip.deb ytuhd.deb ryd.deb ygs.deb yq.deb ytvo.deb demc.deb; do
+            if [ -f "$deb" ]; then
+              tweaks="$tweaks $deb"
             fi
           done
 
